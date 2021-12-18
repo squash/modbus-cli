@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"log"
@@ -21,31 +22,36 @@ type RoverData struct {
 }
 
 type config struct {
-	Port    string
-	Device  int
-	Baud    int
-	Retries int
-	Address string
-	Bytes   uint
+	Port     string
+	Device   uint
+	Baud     int
+	Retries  uint
+	Address  string
+	Count    uint
+	OutputAs string
 }
 
 func main() {
 	var c config
 	flag.StringVar(&c.Port, "port", "/dev/ttyUSB0", "Serial device (example: /dev/ttyUSB0")
-	flag.IntVar(&c.Device, "device", 1, "Modbus device id to query")
+	flag.UintVar(&c.Device, "device", 1, "Modbus device id to query")
 	flag.IntVar(&c.Baud, "baud", 9600, "Baud rate")
 	flag.StringVar(&c.Address, "address", "0x100", "Data address to query (hex prefixed with 0x, or decimal)")
-	flag.UintVar(&c.Bytes, "bytes", 1, "Number of 8 bit bytes for result")
-	flag.IntVar(&c.Retries, "retries", 1, "Retry query this many times")
+	flag.UintVar(&c.Count, "count", 1, "Number of 16 bit registers to read")
+	flag.UintVar(&c.Retries, "retries", 1, "Retry query this many times")
+	flag.StringVar(&c.OutputAs, "output-as", "go", "Format to print output values. Options: hex, decimal, go")
 	flag.Parse()
 
-	for x := 0; x < c.Retries; x++ {
+	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" {
+		log.Fatal("Output format invalid")
+	}
+	for x := uint(0); x < c.Retries; x++ {
 		handler := modbus.NewRTUClientHandler(c.Port)
 		handler.BaudRate = c.Baud
 		handler.DataBits = 8
 		handler.Parity = "N"
 		handler.StopBits = 1
-		handler.SlaveId = 1
+		handler.SlaveId = byte(c.Device)
 		handler.Timeout = 5 * time.Second
 
 		err := handler.Connect()
@@ -54,23 +60,43 @@ func main() {
 		}
 		defer handler.Close()
 		client := modbus.NewClient(handler)
-		var a uint64
+		var a uint16
 		if strings.HasPrefix(c.Address, "0x") {
 			tmp := c.Address[2:]
-			a, err = strconv.ParseUint(tmp, 16, 64)
+			b, err := strconv.ParseUint(tmp, 16, 16)
 			if err != nil {
 				log.Fatal(err)
 			}
+			a=uint16(b)
 		} else {
-			a, err = strconv.ParseUint(c.Address, 16, 64)
+			b, err := strconv.ParseUint(c.Address, 10, 16)
 			if err != nil {
 				log.Fatal(err)
 			}
+			a=uint16(b)
 		}
-		results, err := client.ReadHoldingRegisters(uint16(a), uint16(c.Bytes))
+		results, err := client.ReadHoldingRegisters(a, uint16(c.Count))
 		if err != nil {
+			if err.Error()=="serial: timeout" { 
+				continue
+			}
 			log.Fatal(err)
 		}
-		fmt.Printf("%#v", results)
+		switch c.OutputAs {
+		case "go":
+			fmt.Printf("%#v ", results)
+		case "hex":
+			for x:=uint(0);x<c.Count;x++ {
+				tmp := binary.BigEndian.Uint16(results[x*2:])
+				fmt.Printf("0x%x ", tmp)
+			}
+		case "decimal":
+			for x:=uint(0);x<c.Count;x++ {
+				tmp := binary.BigEndian.Uint16(results[x*2:])
+				fmt.Printf("%d ", tmp)
+			}
+		}
+		fmt.Println()
+		return
 	}
 }
