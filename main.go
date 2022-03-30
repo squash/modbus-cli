@@ -14,14 +14,6 @@ import (
 	"github.com/goburrow/modbus"
 )
 
-type RoverData struct {
-	PVVolts     float32
-	PVAmps      float32
-	ChargeVolts float32
-	ChargeAmps  float32
-	ChargeMode  string
-	Timestamp   int64
-}
 
 type config struct {
 	Port       string
@@ -35,6 +27,7 @@ type config struct {
 	WriteValue string
 }
 
+// getUint16FromString will parse a hex or decimal value to a uint16, also detect '=' for 8 bit masking
 func getUint16FromString(in string) (uint16, bool) {
 	var a uint16
 	iseight := false
@@ -66,6 +59,7 @@ type result struct {
 	Values  []uint16
 }
 
+// readRegister actually pulls data via the serial modbus connection and outputs as it goes unless we're using json
 func readRegister(client modbus.Client, a string, outputas string, count uint) (result, error) {
 	var r result
 	iseight := false
@@ -129,7 +123,7 @@ func main() {
 	checks := strings.Split(c.Address, ",")
 	if c.Write {
 		if len(checks) != 1 {
-			log.Fatal("Write can only target a single register")
+			log.Fatal("Write can only target a single register.")
 		}
 		a, _ := getUint16FromString(checks[0])
 		v, _ := getUint16FromString(c.WriteValue)
@@ -139,7 +133,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond) // modbus serial seems to need a rest between queries
 		log.Printf("%#v", results)
 	}
 	var results []result
@@ -153,7 +147,7 @@ func main() {
 				}
 				log.Println(err)
 			} else {
-				time.Sleep(10 * time.Millisecond)
+				time.Sleep(10 * time.Millisecond) // modbus serial seems to need a rest between queries
 				results = append(results, r)
 			}
 
