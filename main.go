@@ -100,13 +100,6 @@ func main() {
 	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" && c.OutputAs != "json" {
 		log.Fatal("Output format invalid")
 	}
-	handler := modbus.NewRTUClientHandler(c.Port)
-	handler.BaudRate = c.Baud
-	handler.DataBits = 8
-	handler.Parity = "N"
-	handler.StopBits = 1
-	handler.SlaveId = byte(c.Device)
-	handler.Timeout = 5 * time.Second
 
 	checks := strings.Split(c.Address, ",")
 	if c.Write {
@@ -115,6 +108,13 @@ func main() {
 		}
 		a := getUint16FromString(checks[0])
 		v := getUint16FromString(c.WriteValue)
+		handler := modbus.NewRTUClientHandler(c.Port)
+		handler.BaudRate = c.Baud
+		handler.DataBits = 8
+		handler.Parity = "N"
+		handler.StopBits = 1
+		handler.SlaveId = byte(c.Device)
+		handler.Timeout = 5 * time.Second
 
 		err := handler.Connect()
 		if err != nil {
@@ -131,6 +131,13 @@ func main() {
 	var results []result
 	for _, address := range checks {
 		for x := uint(0); x < c.Retries; x++ {
+			handler := modbus.NewRTUClientHandler(c.Port)
+			handler.BaudRate = c.Baud
+			handler.DataBits = 8
+			handler.Parity = "N"
+			handler.StopBits = 1
+			handler.SlaveId = byte(c.Device)
+			handler.Timeout = 5 * time.Second
 
 			err := handler.Connect()
 			if err != nil {
