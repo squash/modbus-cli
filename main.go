@@ -113,11 +113,11 @@ func main() {
 		}
 		defer handler.Close()
 
-	checks:=strings.Split(",", c.Address)
+	checks:=strings.Split(c.Address,",")
 		client := modbus.NewClient(handler)
 		if c.Write {
 			if len(checks)!=1 {
-				log.Fatal("Write can only target a sigle register")
+				log.Fatal("Write can only target a single register")
 			}
 			a:=getUint16FromString(checks[0])
 			v:=getUint16FromString(c.WriteValue)
