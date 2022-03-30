@@ -145,8 +145,8 @@ func main() {
 	}
 
 	if c.OutputAs == "json" {
-		j, err := json.Marshal(&results)
-		if err != nil {
+		j, err := json.Marshal(results)
+		if err == nil {
 			fmt.Println(j)
 		} else {
 			log.Println(err)
