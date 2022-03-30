@@ -29,8 +29,29 @@ type config struct {
 	Address  string
 	Count    uint
 	OutputAs string
+	Write bool
+	WriteValue string
 }
 
+func getUint16FromString(in string) uint16 {
+		var a uint16
+		if strings.HasPrefix(in, "0x") {
+			tmp := in[2:]
+			b, err := strconv.ParseUint(tmp, 16, 16)
+			if err != nil {
+				log.Fatal(err)
+			}
+			a=uint16(b)
+		} else {
+			b, err := strconv.ParseUint(in, 10, 16)
+			if err != nil {
+				log.Fatal(err)
+			}
+			a=uint16(b)
+		}
+		return a
+
+}
 func main() {
 	var c config
 	flag.StringVar(&c.Port, "port", "/dev/ttyUSB0", "Serial device (example: /dev/ttyUSB0")
@@ -40,6 +61,8 @@ func main() {
 	flag.UintVar(&c.Count, "count", 1, "Number of 16 bit registers to read")
 	flag.UintVar(&c.Retries, "retries", 1, "Retry query this many times")
 	flag.StringVar(&c.OutputAs, "output-as", "go", "Format to print output values. Options: hex, decimal, go")
+	flag.BoolVar(&c.Write, "write", false, "Write [value] to [address], then read it back" )
+	flag.StringVar(&c.WriteValue, "value", "", "Value to be written (hex prefixed with 0x, or decimal)")
 	flag.Parse()
 
 	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" {
@@ -60,20 +83,14 @@ func main() {
 		}
 		defer handler.Close()
 		client := modbus.NewClient(handler)
-		var a uint16
-		if strings.HasPrefix(c.Address, "0x") {
-			tmp := c.Address[2:]
-			b, err := strconv.ParseUint(tmp, 16, 16)
+		a:=getUint16FromString(c.Address)
+		if c.Write {
+			v:=getUint16FromString(c.WriteValue)
+			results,err:=client.WriteSingleRegister(a, v)
 			if err != nil {
 				log.Fatal(err)
 			}
-			a=uint16(b)
-		} else {
-			b, err := strconv.ParseUint(c.Address, 10, 16)
-			if err != nil {
-				log.Fatal(err)
-			}
-			a=uint16(b)
+			log.Printf("%#v", results)
 		}
 		results, err := client.ReadHoldingRegisters(a, uint16(c.Count))
 		if err != nil {
