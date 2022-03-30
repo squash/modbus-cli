@@ -41,7 +41,7 @@ func getUint16FromString(in string) (uint16,bool) {
 	// Add support for =8 suffix on addresses
 	tmp:=strings.Split(in, "=")
 	in=tmp[0]
-	if len(tmp)==1 {
+	if len(tmp)==2 {
 		iseight=true
 	}
 	if strings.HasPrefix(in, "0x") {
