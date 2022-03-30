@@ -35,14 +35,14 @@ type config struct {
 	WriteValue string
 }
 
-func getUint16FromString(in string) (uint16,bool) {
+func getUint16FromString(in string) (uint16, bool) {
 	var a uint16
-	iseight:=false
+	iseight := false
 	// Add support for =8 suffix on addresses
-	tmp:=strings.Split(in, "=")
-	in=tmp[0]
-	if len(tmp)==2 {
-		iseight=true
+	tmp := strings.Split(in, "=")
+	in = tmp[0]
+	if len(tmp) == 2 {
+		iseight = true
 	}
 	if strings.HasPrefix(in, "0x") {
 		tmp := in[2:]
@@ -58,7 +58,7 @@ func getUint16FromString(in string) (uint16,bool) {
 		}
 		a = uint16(b)
 	}
-	return a,iseight
+	return a, iseight
 }
 
 type result struct {
@@ -68,8 +68,8 @@ type result struct {
 
 func readRegister(client modbus.Client, a string, outputas string, count uint) (result, error) {
 	var r result
-	iseight:=false
-	r.Address,iseight = getUint16FromString(a)
+	iseight := false
+	r.Address, iseight = getUint16FromString(a)
 	v, err := client.ReadHoldingRegisters(r.Address, uint16(count))
 	if err != nil {
 		if err.Error() == "serial: timeout" {
@@ -80,7 +80,7 @@ func readRegister(client modbus.Client, a string, outputas string, count uint) (
 	for x := uint(0); x < count; x++ {
 		tmp := binary.BigEndian.Uint16(v[x*2:])
 		if iseight {
-			tmp=tmp&255
+			tmp = tmp & 255
 		}
 		r.Values = append(r.Values, tmp)
 		switch outputas {
@@ -103,7 +103,7 @@ func main() {
 	flag.StringVar(&c.Address, "address", "0x100", "Data address to query (hex prefixed with 0x, or decimal). Separate multiple addresses with a comma to read multiple registers. Add =8 to an address to only return the lower 8 bits.")
 	flag.UintVar(&c.Count, "count", 1, "Number of 16 bit registers to read")
 	flag.UintVar(&c.Retries, "retries", 1, "Retry query this many times")
-	flag.StringVar(&c.OutputAs, "output-as", "go", "Format to print output values. Options: hex, decimal, go")
+	flag.StringVar(&c.OutputAs, "output-as", "go", "Format to print output values. Options: hex, decimal, go, json")
 	flag.BoolVar(&c.Write, "write", false, "Write [value] to [address], then read it back")
 	flag.StringVar(&c.WriteValue, "value", "", "Value to be written (hex prefixed with 0x, or decimal)")
 	flag.Parse()
@@ -111,61 +111,49 @@ func main() {
 	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" && c.OutputAs != "json" {
 		log.Fatal("Output format invalid")
 	}
+	handler := modbus.NewRTUClientHandler(c.Port)
+	handler.BaudRate = c.Baud
+	handler.DataBits = 8
+	handler.Parity = "N"
+	handler.StopBits = 1
+	handler.SlaveId = byte(c.Device)
+	handler.Timeout = 5 * time.Second
+
+	err := handler.Connect()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer handler.Close()
+	client := modbus.NewClient(handler)
 
 	checks := strings.Split(c.Address, ",")
 	if c.Write {
 		if len(checks) != 1 {
 			log.Fatal("Write can only target a single register")
 		}
-		a,_ := getUint16FromString(checks[0])
-		v,_ := getUint16FromString(c.WriteValue)
-		handler := modbus.NewRTUClientHandler(c.Port)
-		handler.BaudRate = c.Baud
-		handler.DataBits = 8
-		handler.Parity = "N"
-		handler.StopBits = 1
-		handler.SlaveId = byte(c.Device)
-		handler.Timeout = 5 * time.Second
+		a, _ := getUint16FromString(checks[0])
+		v, _ := getUint16FromString(c.WriteValue)
 
-		err := handler.Connect()
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer handler.Close()
 		client := modbus.NewClient(handler)
 		results, err := client.WriteSingleRegister(a, v)
 		if err != nil {
 			log.Fatal(err)
 		}
-		handler.Close()
+		time.Sleep(10 * time.Millisecond)
 		log.Printf("%#v", results)
 	}
 	var results []result
 	for _, address := range checks {
 		for x := uint(0); x < c.Retries; x++ {
-			handler := modbus.NewRTUClientHandler(c.Port)
-			handler.BaudRate = c.Baud
-			handler.DataBits = 8
-			handler.Parity = "N"
-			handler.StopBits = 1
-			handler.SlaveId = byte(c.Device)
-			handler.Timeout = 5 * time.Second
-
-			err := handler.Connect()
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer handler.Close()
-			client := modbus.NewClient(handler)
-
 			r, err := readRegister(client, address, c.OutputAs, c.Count)
-			handler.Close()
+
 			if err != nil {
 				if err.Error() == "serial: timeout" {
 					continue
 				}
 				log.Println(err)
 			} else {
+				time.Sleep(10 * time.Millisecond)
 				results = append(results, r)
 			}
 
