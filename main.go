@@ -96,7 +96,7 @@ func main() {
 	flag.StringVar(&c.WriteValue, "value", "", "Value to be written (hex prefixed with 0x, or decimal)")
 	flag.Parse()
 
-	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" {
+	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" && c.OutputAs!="json" {
 		log.Fatal("Output format invalid")
 	}
 		handler := modbus.NewRTUClientHandler(c.Port)
