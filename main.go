@@ -126,6 +126,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		handler.Close()
 		log.Printf("%#v", results)
 	}
 	var results []result
@@ -147,6 +148,7 @@ func main() {
 			client := modbus.NewClient(handler)
 
 			r, err := readRegister(client, address, c.OutputAs, c.Count)
+			handler.Close()
 			if err != nil {
 				if err.Error() == "serial: timeout" {
 					continue
