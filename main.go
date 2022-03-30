@@ -35,8 +35,15 @@ type config struct {
 	WriteValue string
 }
 
-func getUint16FromString(in string) uint16 {
+func getUint16FromString(in string) (uint16,bool) {
 	var a uint16
+	iseight:=false
+	// Add support for =8 suffix on addresses
+	tmp:=strings.Split(in, "=")
+	in=tmp[0]
+	if len(tmp)==1 {
+		iseight=true
+	}
 	if strings.HasPrefix(in, "0x") {
 		tmp := in[2:]
 		b, err := strconv.ParseUint(tmp, 16, 16)
@@ -51,7 +58,7 @@ func getUint16FromString(in string) uint16 {
 		}
 		a = uint16(b)
 	}
-	return a
+	return a,iseight
 }
 
 type result struct {
@@ -61,7 +68,8 @@ type result struct {
 
 func readRegister(client modbus.Client, a string, outputas string, count uint) (result, error) {
 	var r result
-	r.Address = getUint16FromString(a)
+	iseight:=false
+	r.Address,iseight = getUint16FromString(a)
 	v, err := client.ReadHoldingRegisters(r.Address, uint16(count))
 	if err != nil {
 		if err.Error() == "serial: timeout" {
@@ -71,6 +79,9 @@ func readRegister(client modbus.Client, a string, outputas string, count uint) (
 	}
 	for x := uint(0); x < count; x++ {
 		tmp := binary.BigEndian.Uint16(v[x*2:])
+		if iseight {
+			tmp=tmp&255
+		}
 		r.Values = append(r.Values, tmp)
 		switch outputas {
 		case "go":
@@ -89,7 +100,7 @@ func main() {
 	flag.StringVar(&c.Port, "port", "/dev/ttyUSB0", "Serial device (example: /dev/ttyUSB0")
 	flag.UintVar(&c.Device, "device", 1, "Modbus device id to query")
 	flag.IntVar(&c.Baud, "baud", 9600, "Baud rate")
-	flag.StringVar(&c.Address, "address", "0x100", "Data address to query (hex prefixed with 0x, or decimal). Separate multiple addresses with a comma to read multiple registers.")
+	flag.StringVar(&c.Address, "address", "0x100", "Data address to query (hex prefixed with 0x, or decimal). Separate multiple addresses with a comma to read multiple registers. Add =8 to an address to only return the lower 8 bits.")
 	flag.UintVar(&c.Count, "count", 1, "Number of 16 bit registers to read")
 	flag.UintVar(&c.Retries, "retries", 1, "Retry query this many times")
 	flag.StringVar(&c.OutputAs, "output-as", "go", "Format to print output values. Options: hex, decimal, go")
@@ -106,8 +117,8 @@ func main() {
 		if len(checks) != 1 {
 			log.Fatal("Write can only target a single register")
 		}
-		a := getUint16FromString(checks[0])
-		v := getUint16FromString(c.WriteValue)
+		a,_ := getUint16FromString(checks[0])
+		v,_ := getUint16FromString(c.WriteValue)
 		handler := modbus.NewRTUClientHandler(c.Port)
 		handler.BaudRate = c.Baud
 		handler.DataBits = 8
