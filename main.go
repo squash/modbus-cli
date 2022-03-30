@@ -115,13 +115,13 @@ func main() {
 	defer handler.Close()
 
 	checks := strings.Split(c.Address, ",")
-	client := modbus.NewClient(handler)
 	if c.Write {
 		if len(checks) != 1 {
 			log.Fatal("Write can only target a single register")
 		}
 		a := getUint16FromString(checks[0])
 		v := getUint16FromString(c.WriteValue)
+		client := modbus.NewClient(handler)
 		results, err := client.WriteSingleRegister(a, v)
 		if err != nil {
 			log.Fatal(err)
@@ -131,6 +131,8 @@ func main() {
 	var results []result
 	for _, address := range checks {
 		for x := uint(0); x < c.Retries; x++ {
+			client := modbus.NewClient(handler)
+
 			r, err := readRegister(client, address, c.OutputAs, c.Count)
 			if err != nil {
 				if err.Error() == "serial: timeout" {
@@ -145,7 +147,7 @@ func main() {
 	}
 
 	if c.OutputAs == "json" {
-		j, err := json.Marshal(results)
+		j, err := json.Marshal(&results)
 		if err == nil {
 			fmt.Println(j)
 		} else {
