@@ -108,12 +108,6 @@ func main() {
 	handler.SlaveId = byte(c.Device)
 	handler.Timeout = 5 * time.Second
 
-	err := handler.Connect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer handler.Close()
-
 	checks := strings.Split(c.Address, ",")
 	if c.Write {
 		if len(checks) != 1 {
@@ -121,6 +115,12 @@ func main() {
 		}
 		a := getUint16FromString(checks[0])
 		v := getUint16FromString(c.WriteValue)
+
+		err := handler.Connect()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer handler.Close()
 		client := modbus.NewClient(handler)
 		results, err := client.WriteSingleRegister(a, v)
 		if err != nil {
@@ -131,6 +131,12 @@ func main() {
 	var results []result
 	for _, address := range checks {
 		for x := uint(0); x < c.Retries; x++ {
+
+			err := handler.Connect()
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer handler.Close()
 			client := modbus.NewClient(handler)
 
 			r, err := readRegister(client, address, c.OutputAs, c.Count)
@@ -149,7 +155,7 @@ func main() {
 	if c.OutputAs == "json" {
 		j, err := json.Marshal(&results)
 		if err == nil {
-			fmt.Println(j)
+			fmt.Println(string(j))
 		} else {
 			log.Println(err)
 		}
