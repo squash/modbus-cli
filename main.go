@@ -119,7 +119,7 @@ func main() {
 	}
 	defer handler.Close()
 	client := modbus.NewClient(handler)
-
+	success:=false
 	checks := strings.Split(c.Address, ",")
 	if c.Write {
 		if len(checks) != 1 {
@@ -128,17 +128,21 @@ func main() {
 		a, _ := getUint16FromString(checks[0])
 		v, _ := getUint16FromString(c.WriteValue)
 
+		for x:=x;x<c.Retries && !success;x++ {
 		client := modbus.NewClient(handler)
 		results, err := client.WriteSingleRegister(a, v)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
+		} else {
+			success=true
 		}
 		time.Sleep(10 * time.Millisecond) // modbus serial seems to need a rest between queries
 		log.Printf("%#v", results)
 	}
 	var results []result
 	for _, address := range checks {
-		for x := uint(0); x < c.Retries; x++ {
+		success=false
+		for x := uint(0); x < c.Retries && !success; x++ {
 			r, err := readRegister(client, address, c.OutputAs, c.Count)
 
 			if err != nil {
@@ -147,6 +151,7 @@ func main() {
 				}
 				log.Println(err)
 			} else {
+				success=true
 				time.Sleep(10 * time.Millisecond) // modbus serial seems to need a rest between queries
 				results = append(results, r)
 			}
