@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/goburrow/modbus"
+	"github.com/gofrs/flock"
 )
 
 type config struct {
@@ -104,6 +105,17 @@ func main() {
 	if c.OutputAs != "decimal" && c.OutputAs != "hex" && c.OutputAs != "go" && c.OutputAs != "json" {
 		log.Fatal("Output format invalid")
 	}
+	locker := flock.New(c.Port)
+	lock := false
+	var err error
+	for !lock {
+		lock, err = locker.TryLock()
+		if err != nil {
+			log.Println(err.Error())
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	defer locker.Unlock()
 	handler := modbus.NewRTUClientHandler(c.Port)
 	handler.BaudRate = c.Baud
 	handler.DataBits = 8
@@ -112,7 +124,7 @@ func main() {
 	handler.SlaveId = byte(c.Device)
 	handler.Timeout = 5 * time.Second
 
-	err := handler.Connect()
+	err = handler.Connect()
 	if err != nil {
 		log.Fatal(err)
 	}
